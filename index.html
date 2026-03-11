@@ -1,0 +1,1565 @@
+這是我想要重新編輯的目前 canvas 應用程式代碼：
+
+```html type=html
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>音樂闖關大冒險</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-start: #fff7ed;
+            --bg-end: #fdf2f8;
+            --card-bg: rgba(255,255,255,0.88);
+            --card-border: rgba(0,0,0,0.06);
+            --card-shadow: 0 8px 32px rgba(0,0,0,0.08);
+            --text-main: #1e1b4b;
+            --text-sec: #6b7280;
+            --staff-bg: #fffbf5;
+            --staff-line: #6b7280;
+            --note-fill: #1e1b4b;
+            --clef-fill: #4b5563;
+            --accent: #7c3aed;
+            --accent-light: #ede9fe;
+            --gold: #f59e0b;
+            --success: #22c55e;
+            --error: #ef4444;
+            --heart: #ef4444;
+            --overlay: rgba(0,0,0,0.35);
+        }
+        .dark {
+            --bg-start: #0f0524;
+            --bg-end: #1a0a2e;
+            --card-bg: rgba(30,20,60,0.88);
+            --card-border: rgba(255,255,255,0.08);
+            --card-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            --text-main: #f5f3ff;
+            --text-sec: #a1a1aa;
+            --staff-bg: #1a1030;
+            --staff-line: #7c7c8a;
+            --note-fill: #f5f3ff;
+            --clef-fill: #a1a1aa;
+            --accent: #a78bfa;
+            --accent-light: #2e1065;
+            --gold: #fbbf24;
+            --success: #4ade80;
+            --error: #f87171;
+            --heart: #f87171;
+            --overlay: rgba(0,0,0,0.6);
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body {
+            font-family: 'Grandstander', 'Noto Sans TC', cursive, sans-serif;
+            background: linear-gradient(160deg, var(--bg-start), var(--bg-end));
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ====== Screens ====== */
+        .screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 520px;
+            height: 100vh;
+            height: 100dvh;
+            padding: 16px;
+            overflow-y: auto;
+            position: relative;
+        }
+        .screen.active { display: flex; }
+
+        /* ====== Floating BG notes ====== */
+        .bg-notes {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 0;
+        }
+        .bg-note {
+            position: absolute;
+            font-size: 28px;
+            opacity: 0.07;
+            animation: floatNote linear infinite;
+        }
+        .dark .bg-note { opacity: 0.05; }
+        @keyframes floatNote {
+            0% { transform: translateY(110vh) rotate(0deg); }
+            100% { transform: translateY(-10vh) rotate(360deg); }
+        }
+
+        /* ====== Start Screen ====== */
+        .start-icon {
+            font-size: clamp(56px, 15vw, 80px);
+            margin-top: 10vh;
+            animation: bounce-gentle 2s ease-in-out infinite;
+        }
+        @keyframes bounce-gentle {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-12px); }
+        }
+        .game-title {
+            font-weight: 800;
+            font-size: clamp(26px, 7vw, 40px);
+            background: linear-gradient(135deg, #7c3aed, #ec4899, #f59e0b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-align: center;
+            line-height: 1.3;
+            margin: 12px 0 4px;
+        }
+        .game-subtitle {
+            color: var(--text-sec);
+            font-size: clamp(14px, 3.5vw, 17px);
+            font-weight: 500;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .level-preview {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+        .level-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            padding: 10px 14px;
+            box-shadow: var(--card-shadow);
+            transition: transform 0.2s;
+        }
+        .level-row:active { transform: scale(0.98); }
+        .level-num {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 15px;
+            flex-shrink: 0;
+        }
+        .level-info { flex: 1; }
+        .level-info-name {
+            font-weight: 700;
+            font-size: 15px;
+        }
+        .level-info-desc {
+            font-size: 12px;
+            color: var(--text-sec);
+            font-weight: 500;
+        }
+        .level-stars {
+            color: var(--gold);
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .level-stars .empty { opacity: 0.25; }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #7c3aed, #6d28d9);
+            color: #fff;
+            border: none;
+            border-radius: 60px;
+            padding: 14px 48px;
+            font-family: inherit;
+            font-size: 20px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 6px 24px rgba(124,58,237,0.35);
+            transition: transform 0.15s, box-shadow 0.15s;
+            margin-top: 8px;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(124,58,237,0.45); }
+        .btn-primary:active { transform: translateY(0); }
+
+        .btn-secondary {
+            background: var(--card-bg);
+            color: var(--text-main);
+            border: 2px solid var(--accent);
+            border-radius: 60px;
+            padding: 12px 36px;
+            font-family: inherit;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.15s, background 0.15s;
+        }
+        .btn-secondary:hover { background: var(--accent-light); }
+        .btn-secondary:active { transform: scale(0.97); }
+
+        /* ====== Level Intro ====== */
+        .intro-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 28px 24px;
+            box-shadow: var(--card-shadow);
+            text-align: center;
+            width: 100%;
+            margin-top: 15vh;
+            animation: pop-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes pop-in {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .intro-level-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--accent);
+            color: #fff;
+            border-radius: 40px;
+            padding: 6px 18px;
+            font-weight: 700;
+            font-size: 15px;
+            margin-bottom: 12px;
+        }
+        .intro-title {
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+        .intro-desc {
+            color: var(--text-sec);
+            font-size: 15px;
+            font-weight: 500;
+            margin-bottom: 16px;
+        }
+        .intro-notes {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        .intro-note-badge {
+            width: 38px; height: 38px;
+            border-radius: 50%;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 16px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+        }
+        .intro-hint {
+            background: var(--accent-light);
+            border-radius: 12px;
+            padding: 10px 16px;
+            font-size: 13px;
+            color: var(--accent);
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+        .dark .intro-hint { color: #c4b5fd; }
+
+        /* ====== Game Screen ====== */
+        .hud {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 4px;
+            flex-shrink: 0;
+        }
+        .hud-left { display: flex; align-items: center; gap: 8px; }
+        .hud-level {
+            font-weight: 700;
+            font-size: 15px;
+            color: var(--accent);
+        }
+        .hud-center { display: flex; gap: 4px; }
+        .hud-heart {
+            font-size: 22px;
+            color: var(--heart);
+            transition: transform 0.3s, opacity 0.3s;
+        }
+        .hud-heart.lost {
+            opacity: 0.2;
+            transform: scale(0.8);
+        }
+        .hud-heart.losing {
+            animation: heart-break 0.4s ease-out;
+        }
+        @keyframes heart-break {
+            0% { transform: scale(1); }
+            30% { transform: scale(1.3); }
+            100% { transform: scale(0.8); opacity: 0.2; }
+        }
+        .hud-right { display: flex; align-items: center; gap: 6px; }
+        .hud-score {
+            font-weight: 700;
+            font-size: 16px;
+            color: var(--gold);
+        }
+        .hud-timer {
+            font-weight: 700;
+            font-size: 15px;
+            color: var(--error);
+            display: none;
+        }
+        .hud-timer.visible { display: flex; align-items: center; gap: 4px; }
+        .hud-timer.urgent { animation: pulse-red 0.5s ease-in-out infinite; }
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .staff-wrapper {
+            width: 100%;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 0;
+            padding: 8px 0;
+        }
+        .staff-container {
+            width: 100%;
+            max-width: 460px;
+            background: var(--staff-bg);
+            border-radius: 20px;
+            border: 1px solid var(--card-border);
+            box-shadow: var(--card-shadow);
+            padding: 12px 8px;
+            position: relative;
+        }
+        #staff-canvas {
+            width: 100%;
+            display: block;
+        }
+        .staff-container.shake {
+            animation: shake 0.4s ease-out;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-8px); }
+            40% { transform: translateX(8px); }
+            60% { transform: translateX(-5px); }
+            80% { transform: translateX(5px); }
+        }
+        .staff-container.correct-flash {
+            animation: correct-glow 0.5s ease-out;
+        }
+        @keyframes correct-glow {
+            0% { box-shadow: var(--card-shadow); }
+            50% { box-shadow: 0 0 30px rgba(34,197,94,0.4); }
+            100% { box-shadow: var(--card-shadow); }
+        }
+
+        .game-progress {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 4px;
+            flex-shrink: 0;
+        }
+        .progress-text {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-sec);
+        }
+        .progress-bar-wrap {
+            flex: 1;
+            height: 8px;
+            background: var(--card-border);
+            border-radius: 8px;
+            margin: 0 12px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #ec4899);
+            border-radius: 8px;
+            transition: width 0.4s ease;
+            width: 0%;
+        }
+        .streak-badge {
+            display: none;
+            align-items: center;
+            gap: 4px;
+            background: linear-gradient(135deg, #f59e0b, #ef4444);
+            color: #fff;
+            border-radius: 20px;
+            padding: 3px 10px;
+            font-size: 13px;
+            font-weight: 700;
+            animation: pop-in 0.3s ease;
+        }
+        .streak-badge.visible { display: flex; }
+
+        .answer-section {
+            width: 100%;
+            flex-shrink: 0;
+            padding: 8px 0 16px;
+        }
+        .answer-label {
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-sec);
+            margin-bottom: 10px;
+        }
+        .answer-buttons {
+            display: flex;
+            justify-content: center;
+            gap: clamp(4px, 1.5vw, 10px);
+            flex-wrap: nowrap;
+        }
+        .note-btn {
+            width: clamp(40px, 12vw, 60px);
+            height: clamp(40px, 12vw, 60px);
+            border-radius: 50%;
+            border: 3px solid transparent;
+            color: #fff;
+            font-family: inherit;
+            font-size: clamp(16px, 4vw, 22px);
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .note-btn:hover { transform: scale(1.08); }
+        .note-btn:active { transform: scale(0.95); }
+        .note-btn.disabled { pointer-events: none; opacity: 0.5; }
+        .note-btn.correct-btn {
+            animation: btn-correct 0.5s ease;
+            border-color: #fff;
+        }
+        @keyframes btn-correct {
+            0% { transform: scale(1); }
+            40% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        .note-btn.wrong-btn {
+            animation: btn-wrong 0.4s ease;
+            opacity: 0.4;
+        }
+        @keyframes btn-wrong {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-6px); }
+            75% { transform: translateX(6px); }
+        }
+
+        .note-btn[data-note="C"] { background: #ef4444; }
+        .note-btn[data-note="D"] { background: #f97316; }
+        .note-btn[data-note="E"] { background: #ca8a04; }
+        .note-btn[data-note="F"] { background: #16a34a; }
+        .note-btn[data-note="G"] { background: #0891b2; }
+        .note-btn[data-note="A"] { background: #2563eb; }
+        .note-btn[data-note="B"] { background: #9333ea; }
+
+        .feedback-msg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 28px;
+            font-weight: 800;
+            pointer-events: none;
+            opacity: 0;
+            z-index: 10;
+        }
+        .feedback-msg.show-correct {
+            color: var(--success);
+            animation: feedback-pop 0.7s ease-out forwards;
+        }
+        .feedback-msg.show-wrong {
+            color: var(--error);
+            animation: feedback-pop 0.7s ease-out forwards;
+        }
+        @keyframes feedback-pop {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            30% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+            70% { opacity: 1; transform: translate(-50%, -60%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -80%) scale(0.9); }
+        }
+
+        /* ====== Result Screen ====== */
+        .result-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 32px 24px;
+            box-shadow: var(--card-shadow);
+            text-align: center;
+            width: 100%;
+            margin-top: 12vh;
+            animation: pop-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .result-stars {
+            font-size: 40px;
+            margin-bottom: 12px;
+        }
+        .result-stars .fa-star { color: var(--gold); margin: 0 4px; }
+        .result-stars .fa-star.empty { opacity: 0.2; }
+        .result-title {
+            font-size: 26px;
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+        .result-subtitle {
+            color: var(--text-sec);
+            font-size: 15px;
+            font-weight: 500;
+            margin-bottom: 16px;
+        }
+        .result-stats {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .stat-item { text-align: center; }
+        .stat-value {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--accent);
+        }
+        .stat-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-sec);
+        }
+        .result-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        /* ====== Victory ====== */
+        .victory-trophy {
+            font-size: 72px;
+            margin-top: 8vh;
+            animation: bounce-gentle 1.5s ease-in-out infinite;
+        }
+        .victory-title {
+            font-size: 32px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #f59e0b, #ef4444, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 12px 0 8px;
+        }
+        .victory-subtitle {
+            color: var(--text-sec);
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+        .victory-stats {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+        }
+        .victory-stat {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 12px 20px;
+            text-align: center;
+            min-width: 90px;
+        }
+
+        /* ====== Particles ====== */
+        .particle {
+            position: fixed;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 100;
+            animation: particle-fly 0.8s ease-out forwards;
+        }
+        @keyframes particle-fly {
+            0% { opacity: 1; }
+            100% { transform: translate(var(--dx), var(--dy)); opacity: 0; }
+        }
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            pointer-events: none;
+            z-index: 50;
+            top: -10px;
+            animation: confetti-fall linear forwards;
+        }
+        @keyframes confetti-fall {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(80vh) rotate(720deg); opacity: 0; }
+        }
+
+        /* ====== Responsive ====== */
+        @media (max-height: 640px) {
+            .start-icon { margin-top: 4vh; font-size: 48px; }
+            .game-title { font-size: 24px; }
+            .intro-card { margin-top: 8vh; padding: 20px 16px; }
+            .result-card { margin-top: 6vh; padding: 24px 16px; }
+            .staff-container { padding: 8px 4px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Floating background music notes -->
+<div class="bg-notes" id="bgNotes"></div>
+
+<!-- ===== START SCREEN ===== -->
+<div id="screen-start" class="screen active">
+    <div class="start-icon">🎵</div>
+    <h1 class="game-title">音樂闖關大冒險</h1>
+    <p class="game-subtitle">高音譜號音名練習</p>
+    <div class="level-preview" id="levelPreview"></div>
+    <button class="btn-primary" id="btnStart">
+        <i class="fa-solid fa-play"></i>&nbsp; 開始闖關
+    </button>
+</div>
+
+<!-- ===== LEVEL INTRO SCREEN ===== -->
+<div id="screen-intro" class="screen">
+    <div class="intro-card">
+        <div class="intro-level-badge" id="introBadge">
+            <i class="fa-solid fa-flag"></i>
+            <span id="introLevelNum"></span>
+        </div>
+        <h2 class="intro-title" id="introTitle"></h2>
+        <p class="intro-desc" id="introDesc"></p>
+        <div class="intro-notes" id="introNotes"></div>
+        <div class="intro-hint" id="introHint"></div>
+        <button class="btn-primary" id="btnGo">
+            <i class="fa-solid fa-bolt"></i>&nbsp; 準備好了！
+        </button>
+    </div>
+</div>
+
+<!-- ===== GAME SCREEN ===== -->
+<div id="screen-game" class="screen">
+    <div class="hud">
+        <div class="hud-left">
+            <span class="hud-level" id="hudLevel">第 1 關</span>
+        </div>
+        <div class="hud-center" id="hudHearts"></div>
+        <div class="hud-right">
+            <div class="hud-timer" id="hudTimer">
+                <i class="fa-solid fa-clock"></i>
+                <span id="timerText">60</span>
+            </div>
+            <i class="fa-solid fa-star" style="color:var(--gold);font-size:14px;"></i>
+            <span class="hud-score" id="hudScore">0</span>
+        </div>
+    </div>
+
+    <div class="staff-wrapper">
+        <div class="staff-container" id="staffContainer">
+            <canvas id="staff-canvas"></canvas>
+            <div class="feedback-msg" id="feedbackMsg"></div>
+        </div>
+    </div>
+
+    <div class="game-progress">
+        <span class="progress-text" id="progressText">0 / 5</span>
+        <div class="progress-bar-wrap">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div class="streak-badge" id="streakBadge">
+            <i class="fa-solid fa-fire"></i>
+            <span id="streakCount">0</span>
+        </div>
+    </div>
+
+    <div class="answer-section">
+        <p class="answer-label">選擇正確的音名</p>
+        <div class="answer-buttons" id="answerButtons"></div>
+    </div>
+</div>
+
+<!-- ===== RESULT SCREEN ===== -->
+<div id="screen-result" class="screen">
+    <div class="result-card" id="resultCard">
+        <div class="result-stars" id="resultStars"></div>
+        <h2 class="result-title" id="resultTitle"></h2>
+        <p class="result-subtitle" id="resultSubtitle"></p>
+        <div class="result-stats" id="resultStats"></div>
+        <div class="result-buttons" id="resultButtons"></div>
+    </div>
+</div>
+
+<!-- ===== VICTORY SCREEN ===== -->
+<div id="screen-victory" class="screen">
+    <div class="victory-trophy">🏆</div>
+    <h1 class="victory-title">全部過關！</h1>
+    <p class="victory-subtitle" id="victorySubtitle">你已成功完成所有挑戰！</p>
+    <div class="victory-stats" id="victoryStats"></div>
+    <button class="btn-primary" id="btnRestart">
+        <i class="fa-solid fa-rotate-right"></i>&nbsp; 再玩一次
+    </button>
+</div>
+
+<script>
+/* ============================================
+   Dark Mode Detection
+   ============================================ */
+if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    document.documentElement.classList.add('dark');
+}
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(event) {
+    if (event.matches) {
+        document.documentElement.classList.add('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+    }
+});
+
+/* ============================================
+   Configuration
+   ============================================ */
+var NOTE_NAMES = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+
+var NOTE_COLORS = {
+    C: '#ef4444', D: '#f97316', E: '#ca8a04',
+    F: '#16a34a', G: '#0891b2', A: '#2563eb', B: '#9333ea'
+};
+
+var NOTE_FREQ = {
+    C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23,
+    G4: 392.00, A4: 440.00, B4: 493.88,
+    C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46,
+    G5: 783.99, A5: 880.00
+};
+
+// pos = half-staff-spaces from top line (F5=0). Even positions = on line, odd = in space.
+var NOTES_MAP = {
+    A5: { name: 'A', pos: -2, ledger: true },
+    G5: { name: 'G', pos: -1 },
+    F5: { name: 'F', pos: 0 },
+    E5: { name: 'E', pos: 1 },
+    D5: { name: 'D', pos: 2 },
+    C5: { name: 'C', pos: 3 },
+    B4: { name: 'B', pos: 4 },
+    A4: { name: 'A', pos: 5 },
+    G4: { name: 'G', pos: 6 },
+    F4: { name: 'F', pos: 7 },
+    E4: { name: 'E', pos: 8 },
+    D4: { name: 'D', pos: 9 },
+    C4: { name: 'C', pos: 10, ledger: true }
+};
+
+var LEVELS = [
+    {
+        id: 1,
+        name: '線上的音',
+        desc: '認識五線譜上五條線的音符',
+        hint: '口訣：Every Good Boy Does Fine (E G B D F)',
+        notes: ['E4','G4','B4','D5','F5'],
+        target: 5,
+        lives: 3
+    },
+    {
+        id: 2,
+        name: '間上的音',
+        desc: '認識四個間（線與線之間）的音符',
+        hint: '口訣：F A C E 組成「臉」！',
+        notes: ['F4','A4','C5','E5'],
+        target: 5,
+        lives: 3
+    },
+    {
+        id: 3,
+        name: '混合練習',
+        desc: '線上和間上的音符混合出現',
+        hint: '從 E4 到 F5，共 9 個音符',
+        notes: ['E4','F4','G4','A4','B4','C5','D5','E5','F5'],
+        target: 8,
+        lives: 3
+    },
+    {
+        id: 4,
+        name: '上下加線',
+        desc: '加入上加線和下加線的音符',
+        hint: '中央 C（下加一線）到 A5（上加一線）',
+        notes: ['C4','D4','E4','F4','G4','A4','B4','C5','D5','E5','F5','G5','A5'],
+        target: 10,
+        lives: 3
+    },
+    {
+        id: 5,
+        name: '大師挑戰',
+        desc: '限時 60 秒！在時間內完成所有題目',
+        hint: '全部 13 個音符，限時挑戰！',
+        notes: ['C4','D4','E4','F4','G4','A4','B4','C5','D5','E5','F5','G5','A5'],
+        target: 12,
+        lives: 3,
+        timeLimit: 60
+    }
+];
+
+var CORRECT_MSGS = ['太棒了！', '正確！', '厲害！', '答對了！', '很好！', '讚！'];
+var WRONG_MSGS = ['再想想！', '差一點！', '加油！', '不對喔～'];
+
+/* ============================================
+   Game State
+   ============================================ */
+var state = {
+    levelIndex: 0,
+    currentNoteKey: null,
+    score: 0,
+    lives: 3,
+    correctInLevel: 0,
+    wrongInLevel: 0,
+    streak: 0,
+    bestStreak: 0,
+    totalCorrect: 0,
+    totalWrong: 0,
+    timeLeft: 0,
+    timerInterval: null,
+    isAnswering: false,
+    levelStars: [0, 0, 0, 0, 0],
+    lastNoteKey: null
+};
+
+/* ============================================
+   Audio Engine
+   ============================================ */
+var audioCtx = null;
+
+function ensureAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+}
+
+function playTone(freq, duration) {
+    duration = duration || 0.4;
+    try {
+        ensureAudio();
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.25, audioCtx.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + duration + 0.05);
+    } catch(e) { /* silent fail */ }
+}
+
+function playCorrectSound() {
+    playTone(523.25, 0.12);
+    setTimeout(function() { playTone(659.25, 0.12); }, 80);
+    setTimeout(function() { playTone(783.99, 0.25); }, 160);
+}
+
+function playWrongSound() {
+    try {
+        ensureAudio();
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(120, audioCtx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.35);
+    } catch(e) { /* silent fail */ }
+}
+
+/* ============================================
+   Canvas Staff Renderer
+   ============================================ */
+var canvas = document.getElementById('staff-canvas');
+var ctxCanvas = canvas.getContext('2d');
+var CANVAS_LOGICAL_W = 380;
+var CANVAS_LOGICAL_H = 150;
+
+function initCanvas() {
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = CANVAS_LOGICAL_W * dpr;
+    canvas.height = CANVAS_LOGICAL_H * dpr;
+    canvas.style.width = '100%';
+    canvas.style.height = 'auto';
+    canvas.style.aspectRatio = CANVAS_LOGICAL_W + '/' + CANVAS_LOGICAL_H;
+    ctxCanvas.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function getColors() {
+    var dark = document.documentElement.classList.contains('dark');
+    return {
+        staffLine: dark ? '#6b7280' : '#9ca3af',
+        noteFill: dark ? '#f5f3ff' : '#1e1b4b',
+        clefFill: dark ? '#9ca3af' : '#6b7280',
+        bg: dark ? '#1a1030' : '#fffbf5',
+        correctFill: '#22c55e',
+        wrongFill: '#ef4444',
+        labelBg: dark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.9)'
+    };
+}
+
+function drawStaff(noteKey, highlight, showLabel) {
+    var c = getColors();
+    var ctx = ctxCanvas;
+    var w = CANVAS_LOGICAL_W;
+    var h = CANVAS_LOGICAL_H;
+    var ls = 14; // line spacing
+    var staffTop = 38;
+    var staffLeft = 70;
+    var staffRight = w - 16;
+    var noteX = w * 0.55;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Staff lines
+    ctx.strokeStyle = c.staffLine;
+    ctx.lineWidth = 1.4;
+    for (var i = 0; i < 5; i++) {
+        var ly = staffTop + i * ls;
+        ctx.beginPath();
+        ctx.moveTo(staffLeft, ly);
+        ctx.lineTo(staffRight, ly);
+        ctx.stroke();
+    }
+
+    // Treble clef
+    ctx.save();
+    var clefSize = Math.round(ls * 5.8);
+    ctx.font = clefSize + 'px "Times New Roman", "Noto Sans Symbols 2", "Segoe UI Symbol", serif';
+    ctx.fillStyle = c.clefFill;
+    ctx.textBaseline = 'middle';
+    ctx.fillText('\u{1D11E}', staffLeft + ls * 0.3, staffTop + ls * 1.85);
+    ctx.restore();
+
+    // Note
+    if (!noteKey) return;
+    var noteInfo = NOTES_MAP[noteKey];
+    if (!noteInfo) return;
+    var noteY = staffTop + noteInfo.pos * (ls / 2);
+    var noteColor = c.noteFill;
+    if (highlight === 'correct') noteColor = c.correctFill;
+    if (highlight === 'wrong') noteColor = c.wrongFill;
+
+    // Ledger lines
+    ctx.strokeStyle = c.staffLine;
+    ctx.lineWidth = 1.4;
+    if (noteInfo.pos >= 10) {
+        for (var p = 10; p <= noteInfo.pos; p += 2) {
+            var lly = staffTop + p * (ls / 2);
+            ctx.beginPath();
+            ctx.moveTo(noteX - ls * 1.3, lly);
+            ctx.lineTo(noteX + ls * 1.3, lly);
+            ctx.stroke();
+        }
+    }
+    if (noteInfo.pos <= -2) {
+        for (var p2 = -2; p2 >= noteInfo.pos; p2 -= 2) {
+            var lly2 = staffTop + p2 * (ls / 2);
+            ctx.beginPath();
+            ctx.moveTo(noteX - ls * 1.3, lly2);
+            ctx.lineTo(noteX + ls * 1.3, lly2);
+            ctx.stroke();
+        }
+    }
+
+    // Note head (filled ellipse, tilted)
+    ctx.save();
+    ctx.translate(noteX, noteY);
+    ctx.rotate(-0.28);
+    ctx.fillStyle = noteColor;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, ls * 0.7, ls * 0.48, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Stem
+    ctx.strokeStyle = noteColor;
+    ctx.lineWidth = 2;
+    var stemLen = ls * 3;
+    ctx.beginPath();
+    if (noteInfo.pos <= 4) {
+        // stem down, left side
+        ctx.moveTo(noteX - ls * 0.6, noteY + ls * 0.1);
+        ctx.lineTo(noteX - ls * 0.6, noteY + stemLen);
+    } else {
+        // stem up, right side
+        ctx.moveTo(noteX + ls * 0.6, noteY - ls * 0.1);
+        ctx.lineTo(noteX + ls * 0.6, noteY - stemLen);
+    }
+    ctx.stroke();
+
+    // Note name label
+    if (showLabel) {
+        var labelX = noteX + ls * 2.5;
+        var labelColor = NOTE_COLORS[noteInfo.name] || '#666';
+        var radius = ls * 0.85;
+
+        ctx.beginPath();
+        ctx.arc(labelX, noteY, radius, 0, Math.PI * 2);
+        ctx.fillStyle = labelColor;
+        ctx.fill();
+
+        ctx.font = 'bold ' + Math.round(ls * 1.1) + 'px "Grandstander", sans-serif';
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(noteInfo.name, labelX, noteY);
+        ctx.textAlign = 'start';
+    }
+}
+
+/* ============================================
+   Screen Management
+   ============================================ */
+function showScreen(id) {
+    var screens = document.querySelectorAll('.screen');
+    for (var i = 0; i < screens.length; i++) {
+        screens[i].classList.remove('active');
+    }
+    document.getElementById(id).classList.add('active');
+}
+
+/* ============================================
+   Floating Background Notes
+   ============================================ */
+function createBgNotes() {
+    var container = document.getElementById('bgNotes');
+    var symbols = ['♪', '♫', '♬', '♩', '🎵', '🎶'];
+    for (var i = 0; i < 14; i++) {
+        var el = document.createElement('span');
+        el.className = 'bg-note';
+        el.textContent = symbols[i % symbols.length];
+        el.style.left = (Math.random() * 96 + 2) + '%';
+        el.style.fontSize = (18 + Math.random() * 24) + 'px';
+        el.style.animationDuration = (10 + Math.random() * 15) + 's';
+        el.style.animationDelay = (-Math.random() * 20) + 's';
+        container.appendChild(el);
+    }
+}
+
+/* ============================================
+   Level Preview (Start Screen)
+   ============================================ */
+function renderLevelPreview() {
+    var container = document.getElementById('levelPreview');
+    container.innerHTML = '';
+    for (var i = 0; i < LEVELS.length; i++) {
+        var level = LEVELS[i];
+        var row = document.createElement('div');
+        row.className = 'level-row';
+
+        var numDiv = document.createElement('div');
+        numDiv.className = 'level-num';
+        numDiv.textContent = level.id;
+
+        var infoDiv = document.createElement('div');
+        infoDiv.className = 'level-info';
+        var nameP = document.createElement('div');
+        nameP.className = 'level-info-name';
+        nameP.textContent = level.name;
+        var descP = document.createElement('div');
+        descP.className = 'level-info-desc';
+        descP.textContent = level.desc;
+        infoDiv.appendChild(nameP);
+        infoDiv.appendChild(descP);
+
+        var starsDiv = document.createElement('div');
+        starsDiv.className = 'level-stars';
+        starsDiv.id = 'preview-stars-' + i;
+        for (var s = 0; s < 3; s++) {
+            var star = document.createElement('i');
+            star.className = 'fa-solid fa-star' + (s < state.levelStars[i] ? '' : ' empty');
+            starsDiv.appendChild(star);
+        }
+
+        row.appendChild(numDiv);
+        row.appendChild(infoDiv);
+        row.appendChild(starsDiv);
+        container.appendChild(row);
+    }
+}
+
+/* ============================================
+   Level Intro
+   ============================================ */
+function showLevelIntro(levelIdx) {
+    var level = LEVELS[levelIdx];
+    document.getElementById('introLevelNum').textContent = '第 ' + level.id + ' 關';
+    document.getElementById('introTitle').textContent = level.name;
+    document.getElementById('introDesc').textContent = level.desc;
+    document.getElementById('introHint').textContent = '💡 ' + level.hint;
+
+    var notesContainer = document.getElementById('introNotes');
+    notesContainer.innerHTML = '';
+    var uniqueNames = [];
+    for (var i = 0; i < level.notes.length; i++) {
+        var n = NOTES_MAP[level.notes[i]].name;
+        if (uniqueNames.indexOf(n) === -1) uniqueNames.push(n);
+    }
+    for (var j = 0; j < uniqueNames.length; j++) {
+        var badge = document.createElement('div');
+        badge.className = 'intro-note-badge';
+        badge.style.background = NOTE_COLORS[uniqueNames[j]];
+        badge.textContent = uniqueNames[j];
+        notesContainer.appendChild(badge);
+    }
+
+    showScreen('screen-intro');
+}
+
+/* ============================================
+   Game Logic
+   ============================================ */
+function createAnswerButtons() {
+    var container = document.getElementById('answerButtons');
+    container.innerHTML = '';
+    for (var i = 0; i < NOTE_NAMES.length; i++) {
+        var btn = document.createElement('button');
+        btn.className = 'note-btn';
+        btn.setAttribute('data-note', NOTE_NAMES[i]);
+        btn.textContent = NOTE_NAMES[i];
+        btn.addEventListener('click', (function(name) {
+            return function() { handleAnswer(name); };
+        })(NOTE_NAMES[i]));
+        container.appendChild(btn);
+    }
+}
+
+function renderHearts() {
+    var container = document.getElementById('hudHearts');
+    container.innerHTML = '';
+    var level = LEVELS[state.levelIndex];
+    for (var i = 0; i < level.lives; i++) {
+        var heart = document.createElement('i');
+        heart.className = 'fa-solid fa-heart hud-heart';
+        heart.id = 'heart-' + i;
+        if (i >= state.lives) heart.classList.add('lost');
+        container.appendChild(heart);
+    }
+}
+
+function updateHUD() {
+    var level = LEVELS[state.levelIndex];
+    document.getElementById('hudLevel').textContent = '第 ' + level.id + ' 關';
+    document.getElementById('hudScore').textContent = state.score;
+    document.getElementById('progressText').textContent = state.correctInLevel + ' / ' + level.target;
+    document.getElementById('progressBar').style.width = (state.correctInLevel / level.target * 100) + '%';
+
+    var streakBadge = document.getElementById('streakBadge');
+    var streakCount = document.getElementById('streakCount');
+    if (state.streak >= 3) {
+        streakBadge.classList.add('visible');
+        streakCount.textContent = state.streak;
+    } else {
+        streakBadge.classList.remove('visible');
+    }
+
+    // Timer
+    var timerEl = document.getElementById('hudTimer');
+    if (level.timeLimit) {
+        timerEl.classList.add('visible');
+        document.getElementById('timerText').textContent = state.timeLeft;
+        if (state.timeLeft <= 10) {
+            timerEl.classList.add('urgent');
+        } else {
+            timerEl.classList.remove('urgent');
+        }
+    } else {
+        timerEl.classList.remove('visible');
+    }
+}
+
+function pickNextNote() {
+    var level = LEVELS[state.levelIndex];
+    var available = level.notes.slice();
+    // Avoid repeating same note twice
+    if (available.length > 1 && state.lastNoteKey) {
+        var idx = available.indexOf(state.lastNoteKey);
+        if (idx > -1) available.splice(idx, 1);
+    }
+    var chosen = available[Math.floor(Math.random() * available.length)];
+    state.currentNoteKey = chosen;
+    state.lastNoteKey = chosen;
+    return chosen;
+}
+
+function showNextNote() {
+    var noteKey = pickNextNote();
+    drawStaff(noteKey, null, false);
+    state.isAnswering = true;
+
+    // Play note sound
+    if (NOTE_FREQ[noteKey]) {
+        playTone(NOTE_FREQ[noteKey], 0.5);
+    }
+
+    // Enable buttons
+    var btns = document.querySelectorAll('.note-btn');
+    for (var i = 0; i < btns.length; i++) {
+        btns[i].classList.remove('disabled', 'correct-btn', 'wrong-btn');
+    }
+}
+
+function showFeedback(correct) {
+    var el = document.getElementById('feedbackMsg');
+    el.classList.remove('show-correct', 'show-wrong');
+    void el.offsetWidth; // reflow
+    if (correct) {
+        el.textContent = CORRECT_MSGS[Math.floor(Math.random() * CORRECT_MSGS.length)];
+        el.classList.add('show-correct');
+    } else {
+        el.textContent = WRONG_MSGS[Math.floor(Math.random() * WRONG_MSGS.length)];
+        el.classList.add('show-wrong');
+    }
+}
+
+function createParticles(x, y) {
+    var colors = ['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#a855f7'];
+    for (var i = 0; i < 12; i++) {
+        var p = document.createElement('div');
+        p.className = 'particle';
+        p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        p.style.left = x + 'px';
+        p.style.top = y + 'px';
+        p.style.setProperty('--dx', ((Math.random() - 0.5) * 180) + 'px');
+        p.style.setProperty('--dy', (-(Math.random() * 120 + 40)) + 'px');
+        p.style.width = (5 + Math.random() * 6) + 'px';
+        p.style.height = p.style.width;
+        document.body.appendChild(p);
+        (function(el) {
+            el.addEventListener('animationend', function() { el.remove(); });
+        })(p);
+    }
+}
+
+function handleAnswer(noteName) {
+    if (!state.isAnswering) return;
+    state.isAnswering = false;
+
+    var noteInfo = NOTES_MAP[state.currentNoteKey];
+    var correct = noteInfo.name === noteName;
+    var container = document.getElementById('staffContainer');
+
+    // Highlight correct/wrong button
+    var btns = document.querySelectorAll('.note-btn');
+    for (var i = 0; i < btns.length; i++) {
+        btns[i].classList.add('disabled');
+        if (btns[i].getAttribute('data-note') === noteName && !correct) {
+            btns[i].classList.add('wrong-btn');
+        }
+        if (btns[i].getAttribute('data-note') === noteInfo.name) {
+            btns[i].classList.add('correct-btn');
+        }
+    }
+
+    if (correct) {
+        state.correctInLevel++;
+        state.totalCorrect++;
+        state.streak++;
+        if (state.streak > state.bestStreak) state.bestStreak = state.streak;
+
+        var points = 10 + Math.max(0, (state.streak - 1)) * 5;
+        state.score += points;
+
+        drawStaff(state.currentNoteKey, 'correct', true);
+        container.classList.remove('correct-flash');
+        void container.offsetWidth;
+        container.classList.add('correct-flash');
+        showFeedback(true);
+        playCorrectSound();
+
+        // Particles on the staff
+        var rect = container.getBoundingClientRect();
+        createParticles(rect.left + rect.width * 0.55, rect.top + rect.height * 0.4);
+
+        updateHUD();
+
+        var level = LEVELS[state.levelIndex];
+        if (state.correctInLevel >= level.target) {
+            setTimeout(function() { finishLevel(true); }, 700);
+        } else {
+            setTimeout(showNextNote, 700);
+        }
+    } else {
+        state.wrongInLevel++;
+        state.totalWrong++;
+        state.streak = 0;
+        state.lives--;
+
+        drawStaff(state.currentNoteKey, 'wrong', true);
+        container.classList.remove('shake');
+        void container.offsetWidth;
+        container.classList.add('shake');
+        showFeedback(false);
+        playWrongSound();
+
+        // Animate heart loss
+        var heartEl = document.getElementById('heart-' + state.lives);
+        if (heartEl) {
+            heartEl.classList.add('losing');
+            setTimeout(function() {
+                heartEl.classList.remove('losing');
+                heartEl.classList.add('lost');
+            }, 400);
+        }
+
+        updateHUD();
+
+        if (state.lives <= 0) {
+            setTimeout(function() { finishLevel(false); }, 1000);
+        } else {
+            setTimeout(showNextNote, 1200);
+        }
+    }
+}
+
+function startLevel(levelIdx) {
+    state.levelIndex = levelIdx;
+    state.currentNoteKey = null;
+    state.correctInLevel = 0;
+    state.wrongInLevel = 0;
+    state.streak = 0;
+    state.lastNoteKey = null;
+
+    var level = LEVELS[levelIdx];
+    state.lives = level.lives;
+
+    createAnswerButtons();
+    renderHearts();
+    updateHUD();
+    showScreen('screen-game');
+
+    // Timer for level 5
+    if (level.timeLimit) {
+        state.timeLeft = level.timeLimit;
+        updateHUD();
+        state.timerInterval = setInterval(function() {
+            state.timeLeft--;
+            updateHUD();
+            if (state.timeLeft <= 0) {
+                clearInterval(state.timerInterval);
+                state.timerInterval = null;
+                finishLevel(false);
+            }
+        }, 1000);
+    }
+
+    setTimeout(showNextNote, 400);
+}
+
+function finishLevel(passed) {
+    if (state.timerInterval) {
+        clearInterval(state.timerInterval);
+        state.timerInterval = null;
+    }
+    state.isAnswering = false;
+
+    var level = LEVELS[state.levelIndex];
+    var stars = 0;
+    if (passed) {
+        if (state.wrongInLevel === 0) stars = 3;
+        else if (state.wrongInLevel === 1) stars = 2;
+        else stars = 1;
+    }
+    state.levelStars[state.levelIndex] = Math.max(state.levelStars[state.levelIndex], stars);
+
+    // Build result screen
+    var starsHTML = '';
+    for (var s = 0; s < 3; s++) {
+        starsHTML += '<i class="fa-solid fa-star' + (s < stars ? '' : ' empty') + '"></i>';
+    }
+    document.getElementById('resultStars').innerHTML = starsHTML;
+
+    if (passed) {
+        document.getElementById('resultTitle').textContent = '過關成功！';
+        document.getElementById('resultSubtitle').textContent =
+            stars === 3 ? '完美表現！零失誤！' :
+            stars === 2 ? '表現優秀！繼續努力！' : '成功過關！下次爭取更多星星！';
+    } else {
+        document.getElementById('resultTitle').textContent = '挑戰失敗';
+        document.getElementById('resultSubtitle').textContent = state.lives <= 0 ? '愛心用完了，再試一次吧！' : '時間到了！再挑戰一次？';
+    }
+
+    var statsHTML = '' +
+        '<div class="stat-item"><div class="stat-value">' + state.correctInLevel + '</div><div class="stat-label">答對</div></div>' +
+        '<div class="stat-item"><div class="stat-value">' + state.wrongInLevel + '</div><div class="stat-label">答錯</div></div>' +
+        '<div class="stat-item"><div class="stat-value">' + state.score + '</div><div class="stat-label">總分</div></div>';
+    if (level.timeLimit && passed) {
+        var timeBonus = state.timeLeft * 2;
+        state.score += timeBonus;
+        statsHTML += '<div class="stat-item"><div class="stat-value">+' + timeBonus + '</div><div class="stat-label">時間獎勵</div></div>';
+    }
+    document.getElementById('resultStats').innerHTML = statsHTML;
+
+    var buttonsHTML = '';
+    if (passed) {
+        if (state.levelIndex < LEVELS.length - 1) {
+            buttonsHTML = '<button class="btn-secondary" onclick="retryLevel()"><i class="fa-solid fa-rotate-right"></i> 重玩</button>' +
+                          '<button class="btn-primary" onclick="goNextLevel()"><i class="fa-solid fa-arrow-right"></i> 下一關</button>';
+        } else {
+            buttonsHTML = '<button class="btn-primary" onclick="showVictory()"><i class="fa-solid fa-trophy"></i> 查看成績</button>';
+        }
+    } else {
+        buttonsHTML = '<button class="btn-secondary" onclick="goHome()"><i class="fa-solid fa-house"></i> 返回</button>' +
+                      '<button class="btn-primary" onclick="retryLevel()"><i class="fa-solid fa-rotate-right"></i> 再試一次</button>';
+    }
+    document.getElementById('resultButtons').innerHTML = buttonsHTML;
+
+    showScreen('screen-result');
+
+    // Confetti for passed levels
+    if (passed) {
+        createConfettiRain();
+    }
+}
+
+function createConfettiRain() {
+    var card = document.getElementById('resultCard');
+    var colors = ['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#a855f7','#ec4899'];
+    for (var i = 0; i < 40; i++) {
+        (function(idx) {
+            setTimeout(function() {
+                var c = document.createElement('div');
+                c.className = 'confetti';
+                c.style.left = (Math.random() * 100) + '%';
+                c.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                c.style.animationDuration = (1.5 + Math.random() * 2) + 's';
+                c.style.width = (6 + Math.random() * 8) + 'px';
+                c.style.height = (6 + Math.random() * 8) + 'px';
+                c.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+                card.appendChild(c);
+                c.addEventListener('animationend', function() { c.remove(); });
+            }, idx * 40);
+        })(i);
+    }
+}
+
+function retryLevel() {
+    startLevel(state.levelIndex);
+}
+
+function goNextLevel() {
+    showLevelIntro(state.levelIndex + 1);
+}
+
+function goHome() {
+    renderLevelPreview();
+    showScreen('screen-start');
+}
+
+function showVictory() {
+    var totalStars = 0;
+    for (var i = 0; i < state.levelStars.length; i++) totalStars += state.levelStars[i];
+
+    document.getElementById('victorySubtitle').textContent =
+        totalStars >= 13 ? '近乎完美的演出！你是音樂大師！' :
+        totalStars >= 10 ? '很棒的表現！繼續練習更上一層樓！' :
+        '恭喜完成所有關卡！多練習可以拿到更多星星！';
+
+    var statsHTML = '' +
+        '<div class="victory-stat"><div class="stat-value" style="color:var(--gold)">' + totalStars + '/15</div><div class="stat-label">總星數</div></div>' +
+        '<div class="victory-stat"><div class="stat-value">' + state.score + '</div><div class="stat-label">最終分數</div></div>' +
+        '<div class="victory-stat"><div class="stat-value">' + state.totalCorrect + '</div><div class="stat-label">答對</div></div>' +
+        '<div class="victory-stat"><div class="stat-value">' + state.bestStreak + '</div><div class="stat-label">最高連擊</div></div>';
+    document.getElementById('victoryStats').innerHTML = statsHTML;
+
+    showScreen('screen-victory');
+    createConfettiRain();
+}
+
+function resetGame() {
+    state.score = 0;
+    state.totalCorrect = 0;
+    state.totalWrong = 0;
+    state.bestStreak = 0;
+    state.levelStars = [0, 0, 0, 0, 0];
+    renderLevelPreview();
+    showScreen('screen-start');
+}
+
+/* ============================================
+   Event Listeners
+   ============================================ */
+document.getElementById('btnStart').addEventListener('click', function() {
+    ensureAudio();
+    showLevelIntro(0);
+});
+
+document.getElementById('btnGo').addEventListener('click', function() {
+    startLevel(state.levelIndex > 0 ? state.levelIndex : (LEVELS[document.getElementById('introLevelNum').textContent.match(/\d+/)[0] - 1] ? document.getElementById('introLevelNum').textContent.match(/\d+/)[0] - 1 : 0));
+});
+
+document.getElementById('btnRestart').addEventListener('click', resetGame);
+
+/* ============================================
+   Fix btnGo to properly track which level intro is showing
+   ============================================ */
+var pendingLevelIdx = 0;
+var origShowLevelIntro = showLevelIntro;
+showLevelIntro = function(levelIdx) {
+    pendingLevelIdx = levelIdx;
+    origShowLevelIntro(levelIdx);
+};
+document.getElementById('btnGo').removeEventListener('click', function(){});
+document.getElementById('btnGo').addEventListener('click', function() {
+    startLevel(pendingLevelIdx);
+});
+
+/* ============================================
+   Init
+   ============================================ */
+createBgNotes();
+renderLevelPreview();
+initCanvas();
+drawStaff(null, null, false);
+</script>
+</body>
+</html>
+
+
+```
